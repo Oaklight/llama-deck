@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llama-deck"
+dynamic = ["version"]
+authors = [{ name = "Peng Ding", email = "oaklight.cn@gmail.com" }]
+description = "Lightweight web admin panel for llama.cpp server management"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "httpx>=0.28.0",
+    "huggingface-hub>=0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.8.0",
+    "pyright>=1.1.390",
+    "build>=1.2.0",
+    "twine>=6.0.0",
+]
+
+[project.urls]
+Repository = "https://github.com/Oaklight/llama-deck"
+Issues = "https://github.com/Oaklight/llama-deck/issues"
+
+[project.scripts]
+llama-deck = "llama_deck.cli:main"
+
+[tool.setuptools.dynamic]
+version = { attr = "llama_deck.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"llama_deck" = ["static/*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
