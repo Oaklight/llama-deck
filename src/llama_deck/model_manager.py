@@ -142,7 +142,7 @@ class ModelManager:
             limit: Max results to return.
 
         Returns:
-            List of repo/file info dicts.
+            List of repo/file info dicts with model metadata.
         """
         from huggingface_hub import HfApi
 
@@ -156,18 +156,37 @@ class ModelManager:
                 filter="gguf",
                 sort="downloads",
                 limit=limit,
+                expand=["gguf", "lastModified"],
             )
 
             for model in models:
+                # Extract GGUF metadata if available
+                gguf = model.gguf or {}
+                param_count = gguf.get("total")
+                arch = gguf.get("architecture")
+                ctx_len = gguf.get("context_length")
+                total_file_size = gguf.get("totalFileSize")
+
                 results.append({
                     "repo_id": model.id,
                     "author": model.author,
                     "downloads": model.downloads,
                     "likes": model.likes,
+                    "pipeline_tag": model.pipeline_tag,
                     "last_modified": model.last_modified.isoformat()
                     if model.last_modified
                     else None,
                     "tags": model.tags or [],
+                    "param_count": param_count,
+                    "param_count_human": _human_params(param_count)
+                    if param_count
+                    else None,
+                    "architecture": arch,
+                    "context_length": ctx_len,
+                    "total_file_size": total_file_size,
+                    "total_file_size_human": _human_size(total_file_size)
+                    if total_file_size
+                    else None,
                 })
 
         except Exception as e:
@@ -240,6 +259,27 @@ class ModelManager:
         """Get all download tasks (active and recent)."""
         return [t.to_dict() for t in self._downloads.values()]
 
+    def clear_downloads(self, status: str | None = None) -> int:
+        """Remove finished download entries from the list.
+
+        Args:
+            status: If set, only clear downloads with this status
+                    (e.g. "completed", "failed", "cancelled").
+                    If None, clear all non-downloading entries.
+
+        Returns:
+            Number of entries removed.
+        """
+        to_remove = []
+        for key, task in self._downloads.items():
+            if task.status == "downloading":
+                continue
+            if status is None or task.status == status:
+                to_remove.append(key)
+        for key in to_remove:
+            del self._downloads[key]
+        return len(to_remove)
+
     def subscribe_downloads(self) -> asyncio.Queue:
         """Subscribe to download progress events."""
         q: asyncio.Queue = asyncio.Queue(maxsize=50)
@@ -303,3 +343,14 @@ def _human_size(size_bytes: int) -> str:
         if size_bytes < 1024:
             return f"{size_bytes:.1f} {unit}"
     return f"{size_bytes:.1f} PB"
+
+
+def _human_params(count: int) -> str:
+    """Convert parameter count to human-readable string (e.g. 0.6B, 7B)."""
+    if count >= 1_000_000_000:
+        return f"{count / 1_000_000_000:.1f}B"
+    if count >= 1_000_000:
+        return f"{count / 1_000_000:.0f}M"
+    if count >= 1_000:
+        return f"{count / 1_000:.0f}K"
+    return str(count)

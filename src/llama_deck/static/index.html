@@ -318,7 +318,10 @@ td.actions { white-space: nowrap; text-align: right; }
 }
 .hf-result:hover { border-color: var(--accent); }
 .hf-result .repo-name { font-weight: 600; font-size: 14px; color: var(--accent); }
-.hf-result .repo-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.hf-result .repo-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.hf-result .repo-badges .badge { font-size: 11px; padding: 1px 8px; }
+.hf-result .repo-badges .badge::before { display: none; }
+.hf-result .repo-meta { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
 .hf-result .repo-meta span { margin-right: 16px; }
 
 /* ===== File picker ===== */
@@ -379,7 +382,6 @@ td.actions { white-space: nowrap; text-align: right; }
 <div class="tabs">
   <div class="tab active" data-tab="dashboard" data-i18n="tab.dashboard">Dashboard</div>
   <div class="tab" data-tab="models" data-i18n="tab.models">Models</div>
-  <div class="tab" data-tab="download" data-i18n="tab.download">Download</div>
   <div class="tab" data-tab="config" data-i18n="tab.config">Config</div>
   <div class="tab" data-tab="logs" data-i18n="tab.logs">Logs</div>
 </div>
@@ -465,8 +467,9 @@ td.actions { white-space: nowrap; text-align: right; }
     </div>
   </div>
 
-  <!-- Models Tab -->
+  <!-- Models Tab (unified: local models + HF search + downloads) -->
   <div class="tab-panel" id="tab-models">
+    <!-- Local Models -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <h3 style="margin:0;" data-i18n="section.localModels">Local Models</h3>
@@ -485,10 +488,19 @@ td.actions { white-space: nowrap; text-align: right; }
       </table>
       <div class="empty-state" id="modelsEmpty" style="display:none;" data-i18n="empty.models">No GGUF models found in the models directory.</div>
     </div>
-  </div>
 
-  <!-- Download Tab -->
-  <div class="tab-panel" id="tab-download">
+    <!-- Downloads -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;" data-i18n="section.downloads">Downloads</h3>
+        <button class="btn btn-sm" onclick="clearDownloads()" data-i18n="btn.clearDownloads">Clear Finished</button>
+      </div>
+      <div id="downloadsList">
+        <div class="empty-state" data-i18n="empty.downloads">No active downloads.</div>
+      </div>
+    </div>
+
+    <!-- HuggingFace Search -->
     <div class="card">
       <h3 data-i18n="section.searchHF">Search HuggingFace</h3>
       <div class="search-bar">
@@ -496,12 +508,6 @@ td.actions { white-space: nowrap; text-align: right; }
         <button class="btn btn-primary" onclick="searchHF()" data-i18n="btn.search">Search</button>
       </div>
       <div id="hfResults"></div>
-    </div>
-    <div class="card">
-      <h3 data-i18n="section.downloads">Downloads</h3>
-      <div id="downloadsList">
-        <div class="empty-state" data-i18n="empty.downloads">No active downloads.</div>
-      </div>
     </div>
   </div>
 
@@ -610,7 +616,7 @@ const THEMES = {
 /* ===== i18n ===== */
 const I18N = {
   en: {
-    'tab.dashboard':'Dashboard','tab.models':'Models','tab.download':'Download','tab.config':'Config','tab.logs':'Logs',
+    'tab.dashboard':'Dashboard','tab.models':'Models','tab.config':'Config','tab.logs':'Logs',
     'section.server':'Server','section.gpu':'GPU','section.cpuMem':'CPU / Memory','section.storage':'Storage',
     'section.localModels':'Local Models','section.searchHF':'Search HuggingFace','section.downloads':'Downloads',
     'section.config':'llama-server Configuration','section.defaultArgs':'Default Server Arguments',
@@ -618,7 +624,7 @@ const I18N = {
     'stat.cpu':'CPU Usage','stat.ram':'RAM Usage','stat.health':'Health','stat.uptime':'Uptime',
     'btn.start':'Start','btn.stop':'Stop','btn.restart':'Restart','btn.refresh':'Refresh',
     'btn.search':'Search','btn.save':'Save','btn.reset':'Reset','btn.clear':'Clear',
-    'btn.cancel':'Cancel','btn.delete':'Delete','btn.close':'Close',
+    'btn.cancel':'Cancel','btn.delete':'Delete','btn.close':'Close','btn.clearDownloads':'Clear Finished',
     'select.model':'Select a model...','badge.stopped':'Stopped','badge.running':'Running','badge.loading':'Loading...',
     'col.filename':'Filename','col.size':'Size','col.modified':'Modified',
     'cfg.serverPath':'llama-server path','cfg.modelsDir':'Models directory',
@@ -642,7 +648,7 @@ const I18N = {
     'status.idle':'idle','status.busy':'busy',
   },
   zh: {
-    'tab.dashboard':'仪表盘','tab.models':'模型','tab.download':'下载','tab.config':'配置','tab.logs':'日志',
+    'tab.dashboard':'仪表盘','tab.models':'模型','tab.config':'配置','tab.logs':'日志',
     'section.server':'服务器','section.gpu':'GPU','section.cpuMem':'CPU / 内存','section.storage':'存储',
     'section.localModels':'本地模型','section.searchHF':'搜索 HuggingFace','section.downloads':'下载列表',
     'section.config':'llama-server 配置','section.defaultArgs':'默认服务器参数',
@@ -650,7 +656,7 @@ const I18N = {
     'stat.cpu':'CPU 占用','stat.ram':'内存占用','stat.health':'健康状态','stat.uptime':'运行时间',
     'btn.start':'启动','btn.stop':'停止','btn.restart':'重启','btn.refresh':'刷新',
     'btn.search':'搜索','btn.save':'保存','btn.reset':'重置','btn.clear':'清空',
-    'btn.cancel':'取消','btn.delete':'删除','btn.close':'关闭',
+    'btn.cancel':'取消','btn.delete':'删除','btn.close':'关闭','btn.clearDownloads':'清除已完成',
     'select.model':'选择模型...','badge.stopped':'已停止','badge.running':'运行中','badge.loading':'加载中...',
     'col.filename':'文件名','col.size':'大小','col.modified':'修改时间',
     'cfg.serverPath':'llama-server 路径','cfg.modelsDir':'模型目录',
@@ -732,9 +738,8 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
   currentTab = name;
   localStorage.setItem('llama-deck-tab', name);
-  if (name === 'models') loadModels();
+  if (name === 'models') { loadModels(); loadDownloads(); }
   if (name === 'config') loadConfig();
-  if (name === 'download') loadDownloads();
 }
 
 /* ===== Toast ===== */
@@ -952,16 +957,24 @@ async function searchHF() {
   try {
     const data = await api('/api/models/search?q=' + encodeURIComponent(q));
     if (!data.results.length) { container.innerHTML = '<div class="empty-state">' + t('empty.noResults') + '</div>'; return; }
-    container.innerHTML = data.results.map(r => `
+    container.innerHTML = data.results.map(r => {
+      const badges = [];
+      if (r.param_count_human) badges.push(r.param_count_human + ' params');
+      if (r.architecture) badges.push(r.architecture);
+      if (r.context_length) badges.push('ctx ' + r.context_length.toLocaleString());
+      if (r.total_file_size_human) badges.push(r.total_file_size_human);
+      if (r.pipeline_tag) badges.push(r.pipeline_tag);
+      return `
       <div class="hf-result" onclick="showRepoFiles('${esc(r.repo_id)}')">
         <div class="repo-name">${esc(r.repo_id)}</div>
+        ${badges.length ? '<div class="repo-badges">' + badges.map(b => '<span class="badge badge-dim">' + esc(b) + '</span>').join('') + '</div>' : ''}
         <div class="repo-meta">
           <span><svg class="icon"><use href="#ico-download"/></svg> ${r.downloads?.toLocaleString() || '?'}</span>
           <span><svg class="icon"><use href="#ico-heart"/></svg> ${r.likes || 0}</span>
-          ${r.author ? '<span>by ' + esc(r.author) + '</span>' : ''}
+          ${r.last_modified ? '<span>' + new Date(r.last_modified).toLocaleDateString() + '</span>' : ''}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
   } catch (e) {}
 }
 
@@ -986,12 +999,26 @@ async function startDownload(repoId, filename) {
   closeModal('repoFilesModal');
   try {
     await api('/api/models/download', { method: 'POST', body: JSON.stringify({ repo_id: repoId, filename }) });
-    showToast(t('toast.downloadStarted') + ' ' + filename, 'info'); switchTab('download'); loadDownloads();
+    showToast(t('toast.downloadStarted') + ' ' + filename, 'info'); loadDownloads();
   } catch (e) {}
 }
 
 async function loadDownloads() {
   try { const data = await api('/api/downloads'); renderDownloads(data.downloads); } catch (e) {}
+}
+
+async function cancelDownload(repoId, filename) {
+  try {
+    await api('/api/downloads/cancel', { method: 'POST', body: JSON.stringify({ repo_id: repoId, filename }) });
+    showToast(t('btn.cancel') + ': ' + filename); loadDownloads();
+  } catch (e) {}
+}
+
+async function clearDownloads() {
+  try {
+    await api('/api/downloads', { method: 'DELETE' });
+    loadDownloads();
+  } catch (e) {}
 }
 
 function renderDownloads(downloads) {
@@ -1001,7 +1028,13 @@ function renderDownloads(downloads) {
     const pct = (d.progress * 100).toFixed(0);
     let sc = d.status === 'completed' ? 'badge-ok' : d.status === 'failed' ? 'badge-error' : d.status === 'cancelled' ? 'badge-warn' : 'badge-dim';
     return `<div class="download-item">
-      <div class="dl-header"><span class="dl-name">${esc(d.repo_id)} / ${esc(d.filename)}</span><span class="badge ${sc} dl-status">${d.status}</span></div>
+      <div class="dl-header">
+        <span class="dl-name">${esc(d.repo_id)} / ${esc(d.filename)}</span>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="badge ${sc} dl-status">${d.status}</span>
+          ${d.status === 'downloading' ? `<button class="btn btn-sm btn-danger" onclick="cancelDownload('${esc(d.repo_id)}','${esc(d.filename)}')">${t('btn.cancel')}</button>` : ''}
+        </div>
+      </div>
       ${d.status === 'downloading' ? `<div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div><div style="font-size:12px;color:var(--text-dim);margin-top:4px;">${pct}%</div>` : ''}
       ${d.error ? `<div style="font-size:12px;color:var(--red);margin-top:4px;">${esc(d.error)}</div>` : ''}
     </div>`;
@@ -1095,7 +1128,7 @@ function connectSSE() {
     if (d.disks) updateDiskUI(d.disks);
   });
 
-  sseSource.addEventListener('download', () => { if (currentTab === 'download') loadDownloads(); });
+  sseSource.addEventListener('download', () => { if (currentTab === 'models') loadDownloads(); });
 
   sseSource.onerror = () => {
     setTimeout(() => { if (sseSource) { sseSource.close(); sseSource = null; } connectSSE(); }, 3000);

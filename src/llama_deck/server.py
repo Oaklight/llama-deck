@@ -158,6 +158,25 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
         """Get active and recent download status."""
         return {"downloads": app.models.get_downloads()}
 
+    @app.delete("/api/downloads")
+    async def clear_downloads(request):
+        """Clear finished download entries."""
+        status = request.query_params.get("status", [None])[0]
+        removed = app.models.clear_downloads(status)
+        return {"cleared": removed}
+
+    @app.post("/api/downloads/cancel")
+    async def cancel_download(request):
+        """Cancel an active download."""
+        data = request.json()
+        repo = data.get("repo_id")
+        filename = data.get("filename")
+        if not repo or not filename:
+            abort(400, "Missing 'repo_id' and/or 'filename'")
+        if app.models.cancel_download(repo, filename):
+            return {"cancelled": True}
+        abort(404, "Download not found or already finished")
+
     # --- Server lifecycle ---
 
     @app.post("/api/server/start")
