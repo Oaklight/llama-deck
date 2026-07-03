@@ -233,6 +233,16 @@ class LlamaInstance:
 
         return await asyncio.to_thread(_check)
 
+    @property
+    def mode(self) -> str:
+        """Instance mode: 'chat', 'embedding', 'reranking', or 'chat'."""
+        if self._args:
+            if self._args.reranking:
+                return "reranking"
+            if self._args.embedding:
+                return "embedding"
+        return "chat"
+
     def status(self) -> dict:
         """Get current instance status summary."""
         return {
@@ -241,6 +251,7 @@ class LlamaInstance:
             "running": self.is_running,
             "model": self._current_model,
             "port": self.port,
+            "mode": self.mode,
             "uptime": self.uptime,
             "pid": self._process.pid if self._process and self.is_running else None,
         }
@@ -271,6 +282,15 @@ class LlamaInstance:
 
         if args.metrics:
             cmd.append("--metrics")
+
+        if args.embedding:
+            cmd.append("--embedding")
+
+        if args.reranking:
+            cmd.append("--reranking")
+
+        if args.pooling:
+            cmd.extend(["--pooling", args.pooling])
 
         return cmd
 

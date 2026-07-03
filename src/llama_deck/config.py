@@ -26,6 +26,10 @@ class ServerArgs:
     parallel: int = 1
     cont_batching: bool = True
     metrics: bool = True
+    # Embedding / reranking mode
+    embedding: bool = False
+    reranking: bool = False
+    pooling: str = ""  # none, mean, cls, last, rank (empty = model default)
 
     def to_dict(self) -> dict:
         """Serialize to dict."""
@@ -41,6 +45,9 @@ class ServerArgs:
             "parallel": self.parallel,
             "cont_batching": self.cont_batching,
             "metrics": self.metrics,
+            "embedding": self.embedding,
+            "reranking": self.reranking,
+            "pooling": self.pooling,
         }
 
     @classmethod

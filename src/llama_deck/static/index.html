@@ -419,51 +419,62 @@ td.actions { white-space: nowrap; text-align: right; }
 
   <!-- Dashboard Tab -->
   <div class="tab-panel active" id="tab-dashboard">
-    <!-- GPU Stats -->
-    <div class="section-label" id="gpuSectionLabel" data-i18n="section.gpu">GPU</div>
-    <div class="stat-grid" id="gpuGrid">
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.vram">VRAM Usage</div>
-        <div class="value" id="vramValue">--</div>
-        <div class="progress-bar" id="vramBar"><div class="fill" style="width:0%"></div></div>
-      </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.gpuTemp">GPU Temp</div>
-        <div class="value" id="gpuTempValue">--</div>
-        <div class="sub" id="gpuTempSub"></div>
-      </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.gpuUtil">GPU Utilization</div>
-        <div class="value" id="utilValue">--</div>
-        <div class="progress-bar"><div class="fill" id="utilFill" style="width:0%"></div></div>
-      </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.power">Power</div>
-        <div class="value" id="powerValue">--</div>
-        <div class="sub" id="powerSub"></div>
-      </div>
-    </div>
-
-    <!-- CPU / RAM Stats -->
-    <div class="section-label" data-i18n="section.cpuMem">CPU / Memory</div>
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.cpu">CPU Usage</div>
-        <div class="value" id="cpuValue">--</div>
-        <div class="progress-bar" id="cpuBar"><div class="fill" style="width:0%"></div></div>
-        <div class="sub" id="cpuSub"></div>
-      </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.ram">RAM Usage</div>
-        <div class="value" id="ramValue">--</div>
-        <div class="progress-bar" id="ramBar"><div class="fill" style="width:0%"></div></div>
-        <div class="sub" id="ramSub"></div>
+    <!-- GPU Card -->
+    <div class="card" id="gpuCard">
+      <h3 data-i18n="section.gpu">GPU</h3>
+      <div class="stat-grid" id="gpuGrid">
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.vram">VRAM Usage</div>
+          <div class="value" id="vramValue">--</div>
+          <div class="progress-bar" id="vramBar"><div class="fill" style="width:0%"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.gpuTemp">GPU Temp</div>
+          <div class="value" id="gpuTempValue">--</div>
+          <div class="sub" id="gpuTempSub"></div>
+        </div>
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.gpuUtil">GPU Utilization</div>
+          <div class="value" id="utilValue">--</div>
+          <div class="progress-bar"><div class="fill" id="utilFill" style="width:0%"></div></div>
+        </div>
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.power">Power</div>
+          <div class="value" id="powerValue">--</div>
+          <div class="sub" id="powerSub"></div>
+        </div>
       </div>
     </div>
 
-    <!-- Disk Stats -->
-    <div class="section-label" data-i18n="section.storage">Storage</div>
-    <div class="stat-grid" id="diskGrid"></div>
+    <!-- CPU / RAM Card -->
+    <div class="card">
+      <h3 data-i18n="section.cpuMem">CPU / Memory</h3>
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.cpu">CPU Usage</div>
+          <div class="value" id="cpuValue">--</div>
+          <div class="progress-bar" id="cpuBar"><div class="fill" style="width:0%"></div></div>
+          <div class="sub" id="cpuSub"></div>
+        </div>
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.cpuTemp">CPU Temp</div>
+          <div class="value" id="cpuTempValue">--</div>
+          <div class="sub" id="cpuTempSub"></div>
+        </div>
+        <div class="stat-card">
+          <div class="label" data-i18n="stat.ram">RAM Usage</div>
+          <div class="value" id="ramValue">--</div>
+          <div class="progress-bar" id="ramBar"><div class="fill" style="width:0%"></div></div>
+          <div class="sub" id="ramSub"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Storage Card -->
+    <div class="card">
+      <h3 data-i18n="section.storage">Storage</h3>
+      <div class="stat-grid" id="diskGrid"></div>
+    </div>
 
   </div>
 
@@ -479,6 +490,7 @@ td.actions { white-space: nowrap; text-align: right; }
           <tr>
             <th data-i18n="col.name">Name</th>
             <th data-i18n="col.model">Model</th>
+            <th data-i18n="col.mode">Mode</th>
             <th data-i18n="col.port">Port</th>
             <th data-i18n="col.status">Status</th>
             <th data-i18n="stat.uptime">Uptime</th>
@@ -611,9 +623,19 @@ td.actions { white-space: nowrap; text-align: right; }
       <label data-i18n="col.name">Name</label>
       <input type="text" id="instName" placeholder="my-chat-server">
     </div>
-    <div class="form-group">
-      <label data-i18n="col.model">Model</label>
-      <select id="instModel" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg-input);color:var(--text);"></select>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-i18n="col.model">Model</label>
+        <select id="instModel" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg-input);color:var(--text);"></select>
+      </div>
+      <div class="form-group">
+        <label data-i18n="col.mode">Mode</label>
+        <select id="instMode" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg-input);color:var(--text);">
+          <option value="chat">Chat / Completion</option>
+          <option value="embedding">Embedding</option>
+          <option value="reranking">Reranking</option>
+        </select>
+      </div>
     </div>
     <div class="form-row">
       <div class="form-group">
@@ -697,13 +719,13 @@ const I18N = {
     'section.instances':'Instances','section.localModels':'Local Models','section.searchHF':'Search HuggingFace','section.downloads':'Downloads',
     'section.config':'llama-server Configuration','section.defaultArgs':'Default Server Arguments',
     'stat.vram':'VRAM Usage','stat.gpuTemp':'GPU Temp','stat.gpuUtil':'GPU Utilization','stat.power':'Power',
-    'stat.cpu':'CPU Usage','stat.ram':'RAM Usage','stat.health':'Health','stat.uptime':'Uptime',
+    'stat.cpu':'CPU Usage','stat.cpuTemp':'CPU Temp','stat.ram':'RAM Usage','stat.health':'Health','stat.uptime':'Uptime',
     'btn.start':'Start','btn.stop':'Stop','btn.restart':'Restart','btn.refresh':'Refresh',
     'btn.search':'Search','btn.save':'Save','btn.reset':'Reset','btn.clear':'Clear',
     'btn.cancel':'Cancel','btn.delete':'Delete','btn.close':'Close','btn.clearDownloads':'Clear Finished','btn.clearSearch':'Clear',
     'btn.newInstance':'New Instance','btn.remove':'Remove',
     'select.model':'Select a model...','badge.stopped':'Stopped','badge.running':'Running','badge.loading':'Loading...',
-    'col.filename':'Filename','col.size':'Size','col.modified':'Modified','col.name':'Name','col.model':'Model','col.port':'Port','col.status':'Status',
+    'col.filename':'Filename','col.size':'Size','col.modified':'Modified','col.name':'Name','col.model':'Model','col.mode':'Mode','col.port':'Port','col.status':'Status',
     'empty.instances':'No instances. Click "New Instance" to start one.',
     'modal.newInstance':'New Instance','toast.instanceCreated':'Instance created','toast.instanceRemoved':'Instance removed',
     'cfg.serverPath':'llama-server path','cfg.modelsDir':'Models directory',
@@ -732,13 +754,13 @@ const I18N = {
     'section.instances':'实例','section.localModels':'本地模型','section.searchHF':'搜索 HuggingFace','section.downloads':'下载列表',
     'section.config':'llama-server 配置','section.defaultArgs':'默认服务器参数',
     'stat.vram':'显存占用','stat.gpuTemp':'GPU 温度','stat.gpuUtil':'GPU 利用率','stat.power':'功耗',
-    'stat.cpu':'CPU 占用','stat.ram':'内存占用','stat.health':'健康状态','stat.uptime':'运行时间',
+    'stat.cpu':'CPU 占用','stat.cpuTemp':'CPU 温度','stat.ram':'内存占用','stat.health':'健康状态','stat.uptime':'运行时间',
     'btn.start':'启动','btn.stop':'停止','btn.restart':'重启','btn.refresh':'刷新',
     'btn.search':'搜索','btn.save':'保存','btn.reset':'重置','btn.clear':'清空',
     'btn.cancel':'取消','btn.delete':'删除','btn.close':'关闭','btn.clearDownloads':'清除已完成','btn.clearSearch':'清除',
     'btn.newInstance':'新建实例','btn.remove':'移除',
     'select.model':'选择模型...','badge.stopped':'已停止','badge.running':'运行中','badge.loading':'加载中...',
-    'col.filename':'文件名','col.size':'大小','col.modified':'修改时间','col.name':'名称','col.model':'模型','col.port':'端口','col.status':'状态',
+    'col.filename':'文件名','col.size':'大小','col.modified':'修改时间','col.name':'名称','col.model':'模型','col.mode':'模式','col.port':'端口','col.status':'状态',
     'empty.instances':'暂无实例，点击"新建实例"启动一个。',
     'modal.newInstance':'新建实例','toast.instanceCreated':'实例已创建','toast.instanceRemoved':'实例已移除',
     'cfg.serverPath':'llama-server 路径','cfg.modelsDir':'模型目录',
@@ -861,7 +883,7 @@ async function loadStatus() {
     const data = await api('/api/status');
     updateBadge(data.running_count);
     if (data.gpu) updateGpuUI(data.gpu);
-    if (data.cpu) updateCpuUI(data.cpu);
+    if (data.cpu) updateCpuUI(data.cpu, data.temperatures);
     if (data.ram) updateRamUI(data.ram);
     if (data.disks) updateDiskUI(data.disks);
     updateCapacityBar(data);
@@ -881,12 +903,10 @@ function updateBadge(runningCount) {
 
 function updateGpuUI(gpu) {
   if (!gpu) {
-    document.getElementById('gpuGrid').style.display = 'none';
-    document.getElementById('gpuSectionLabel').style.display = 'none';
+    document.getElementById('gpuCard').style.display = 'none';
     return;
   }
-  document.getElementById('gpuGrid').style.display = '';
-  document.getElementById('gpuSectionLabel').style.display = '';
+  document.getElementById('gpuCard').style.display = '';
 
   const used = gpu.vram_used_mb, total = gpu.vram_total_mb;
   if (used != null && total != null) {
@@ -910,7 +930,7 @@ function updateGpuUI(gpu) {
   }
 }
 
-function updateCpuUI(cpu) {
+function updateCpuUI(cpu, temps) {
   if (!cpu) return;
   document.getElementById('cpuValue').textContent = cpu.percent + '%';
   const bar = document.getElementById('cpuBar');
@@ -921,6 +941,27 @@ function updateCpuUI(cpu) {
   if (cpu.freq_mhz) parts.push(cpu.freq_mhz + ' MHz');
   if (cpu.load_avg) parts.push('Load: ' + cpu.load_avg.join(', '));
   document.getElementById('cpuSub').textContent = parts.join(' | ');
+
+  // CPU temperature — look for common sensor names
+  const cpuTempEl = document.getElementById('cpuTempValue');
+  const cpuTempSub = document.getElementById('cpuTempSub');
+  if (temps) {
+    // Find CPU temp: coretemp/Package, k10temp/Tctl, or first entry with "cpu"/"temp"
+    let cpuTemp = null, sensorName = '';
+    for (const [key, val] of Object.entries(temps)) {
+      const k = key.toLowerCase();
+      if (k.includes('package') || k.includes('tctl') || k.includes('cpu')) {
+        cpuTemp = val.current; sensorName = key; break;
+      }
+    }
+    if (cpuTemp != null) {
+      cpuTempEl.textContent = cpuTemp + '°C';
+      cpuTempSub.textContent = sensorName;
+    } else {
+      cpuTempEl.textContent = '--';
+      cpuTempSub.textContent = '';
+    }
+  }
 }
 
 function updateRamUI(ram) {
@@ -1049,9 +1090,13 @@ function renderInstances(instances) {
     else if (hStatus === 'ok') statusBadge = `<span class="badge badge-ok">${t('badge.running')}</span>`;
     else if (hStatus === 'loading') statusBadge = `<span class="badge badge-warn">${t('badge.loading')}</span>`;
     else statusBadge = `<span class="badge badge-warn">${hStatus}</span>`;
+    const modeBadge = inst.mode === 'embedding' ? '<span class="badge badge-dim" style="font-size:10px">EMB</span>'
+      : inst.mode === 'reranking' ? '<span class="badge badge-dim" style="font-size:10px">RANK</span>'
+      : '<span class="badge badge-dim" style="font-size:10px">CHAT</span>';
     return `<tr>
       <td><strong>${esc(inst.name)}</strong><div style="font-size:11px;color:var(--text-dim)">${esc(inst.instance_id)}</div></td>
       <td><a href="#" onclick="switchTab('models');return false;" style="color:var(--accent)">${esc(inst.model || '--')}</a></td>
+      <td>${modeBadge}</td>
       <td>${inst.port || '--'}</td>
       <td>${statusBadge}</td>
       <td>${inst.uptime != null ? formatDuration(inst.uptime) : '--'}</td>
@@ -1091,6 +1136,7 @@ function openNewInstanceModal() {
 async function createInstance() {
   const model = document.getElementById('instModel').value;
   if (!model) { showToast(t('toast.selectModel'), 'error'); return; }
+  const mode = document.getElementById('instMode').value;
   const payload = {
     model,
     name: document.getElementById('instName').value || undefined,
@@ -1099,6 +1145,8 @@ async function createInstance() {
       n_gpu_layers: parseInt(document.getElementById('instGpuLayers').value) ?? 99,
       ctx_size: parseInt(document.getElementById('instCtxSize').value) || 8192,
       batch_size: parseInt(document.getElementById('instBatchSize').value) || 2048,
+      embedding: mode === 'embedding',
+      reranking: mode === 'reranking',
     },
   };
   closeModal('newInstanceModal');
@@ -1354,7 +1402,7 @@ function connectSSE() {
   sseSource.addEventListener('system', (e) => {
     const d = JSON.parse(e.data);
     if (d.gpu) updateGpuUI(d.gpu);
-    if (d.cpu) updateCpuUI(d.cpu);
+    if (d.cpu) updateCpuUI(d.cpu, d.temperatures);
     if (d.ram) updateRamUI(d.ram);
     if (d.disks) updateDiskUI(d.disks);
     updateCapacityBar(d);
