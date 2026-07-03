@@ -6,9 +6,9 @@ import json
 import logging
 from pathlib import Path
 
-from llama_deck._vendor.httpserver import App, JSONResponse, StreamingResponse, abort
-from llama_deck.config import DeckConfig, save_config
-from llama_deck.llama_manager import LlamaManager
+from llama_deck._vendor.httpserver import App, StreamingResponse, abort
+from llama_deck.config import DeckConfig, ServerArgs, save_config
+from llama_deck.llama_manager import InstanceManager
 from llama_deck.model_manager import ModelManager
 from llama_deck.system_monitor import SystemMonitor
 
@@ -42,7 +42,7 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
     # Attach managers to app
     app.config = config
     app.config_path = config_path
-    app.llama = LlamaManager(config)
+    app.instances = InstanceManager(config)
     app.sysmon = SystemMonitor(disk_paths=[config.models_dir, "/"])
     app.models = ModelManager(config.models_dir)
 
@@ -76,14 +76,21 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
 
     @app.get("/api/status")
     async def get_status(request):
-        """Get combined server status, system info, and health."""
-        server_status = app.llama.status()
-        health = await app.llama.health_check()
+        """Get system info and all instances summary."""
         system = app.sysmon.latest or {}
+        instances = app.instances.list_all()
+
+        # Fetch health for all running instances
+        for inst_status in instances:
+            if inst_status["running"]:
+                inst = app.instances.get(inst_status["instance_id"])
+                inst_status["health"] = await inst.health_check()
+            else:
+                inst_status["health"] = {"status": "not_running"}
 
         return {
-            "server": server_status,
-            "health": health,
+            "instances": instances,
+            "running_count": app.instances.running_count,
             "gpu": system.get("gpu"),
             "cpu": system.get("cpu"),
             "ram": system.get("ram"),
@@ -91,16 +98,139 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
             "temperatures": system.get("temperatures"),
         }
 
+    # --- Instances ---
+
+    @app.get("/api/instances")
+    async def list_instances(request):
+        """List all instances with status and health."""
+        instances = app.instances.list_all()
+        for inst_status in instances:
+            if inst_status["running"]:
+                inst = app.instances.get(inst_status["instance_id"])
+                inst_status["health"] = await inst.health_check()
+            else:
+                inst_status["health"] = {"status": "not_running"}
+        return {
+            "instances": instances,
+            "running_count": app.instances.running_count,
+        }
+
+    @app.post("/api/instances")
+    async def create_instance(request):
+        """Create and start a new llama-server instance."""
+        data = request.json()
+        model = data.get("model")
+
+        if not model:
+            abort(400, "Missing 'model' (filename)")
+
+        try:
+            model_path = app.models.get_model_path(model)
+        except (ValueError, FileNotFoundError) as e:
+            abort(400, str(e))
+
+        args = None
+        if "args" in data:
+            args = ServerArgs.from_dict(data["args"])
+
+        name = data.get("name")
+
+        try:
+            instance = await app.instances.create(model_path, args, name)
+            return {"instance": instance.status()}, 201
+        except RuntimeError as e:
+            abort(409, str(e))
+        except FileNotFoundError as e:
+            abort(404, str(e))
+
+    @app.get("/api/instances/<str:instance_id>")
+    async def get_instance(request, instance_id):
+        """Get specific instance status and health."""
+        try:
+            inst = app.instances.get(instance_id)
+        except KeyError as e:
+            abort(404, str(e))
+
+        status = inst.status()
+        status["health"] = await inst.health_check()
+        return {"instance": status}
+
+    @app.delete("/api/instances/<str:instance_id>")
+    async def remove_instance(request, instance_id):
+        """Stop and remove an instance."""
+        try:
+            await app.instances.remove(instance_id)
+            return {"removed": instance_id}
+        except KeyError as e:
+            abort(404, str(e))
+
+    @app.post("/api/instances/<str:instance_id>/stop")
+    async def stop_instance(request, instance_id):
+        """Stop an instance (keep in registry)."""
+        try:
+            inst = app.instances.get(instance_id)
+        except KeyError as e:
+            abort(404, str(e))
+        await inst.stop()
+        return {"instance": inst.status()}
+
+    @app.post("/api/instances/<str:instance_id>/restart")
+    async def restart_instance(request, instance_id):
+        """Restart an instance."""
+        try:
+            inst = app.instances.get(instance_id)
+        except KeyError as e:
+            abort(404, str(e))
+
+        data = request.json() if request.body else {}
+        model_path = None
+        if "model" in data:
+            try:
+                model_path = app.models.get_model_path(data["model"])
+            except (ValueError, FileNotFoundError) as e:
+                abort(400, str(e))
+
+        args = None
+        if "args" in data:
+            args = ServerArgs.from_dict(data["args"])
+
+        try:
+            await inst.restart(model_path, args)
+            return {"instance": inst.status()}
+        except (RuntimeError, ValueError) as e:
+            abort(400, str(e))
+
+    @app.get("/api/instances/<str:instance_id>/logs")
+    async def get_instance_logs(request, instance_id):
+        """Get log lines for a specific instance."""
+        try:
+            inst = app.instances.get(instance_id)
+        except KeyError as e:
+            abort(404, str(e))
+        n = int(request.query_params.get("n", ["200"])[0])
+        n = min(n, 2000)
+        return {"logs": inst.get_logs(n)}
+
     # --- Models ---
 
     @app.get("/api/models")
     async def list_models(request):
-        """List local GGUF model files."""
-        return {"models": app.models.list_models()}
+        """List local GGUF model files with running instance info."""
+        models = app.models.list_models()
+        # Annotate with running instances
+        for m in models:
+            m["instances"] = app.instances.get_instances_for_model(m["filename"])
+        return {"models": models}
 
     @app.delete("/api/models/<path:name>")
     async def delete_model(request, name):
         """Delete a model file."""
+        # Check if model is in use
+        running = app.instances.get_instances_for_model(name)
+        if running:
+            names = ", ".join(i["name"] for i in running)
+            abort(409, f"Model in use by running instance(s): {names}")
+
         try:
             app.models.delete_model(name)
             return {"deleted": name}
@@ -177,68 +307,6 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
             return {"cancelled": True}
         abort(404, "Download not found or already finished")
 
-    # --- Server lifecycle ---
-
-    @app.post("/api/server/start")
-    async def start_server(request):
-        """Start llama-server with a model."""
-        data = request.json()
-        model = data.get("model")
-
-        if not model:
-            abort(400, "Missing 'model' (filename)")
-
-        try:
-            model_path = app.models.get_model_path(model)
-        except (ValueError, FileNotFoundError) as e:
-            abort(400, str(e))
-
-        # Optional: override server args for this start
-        args = None
-        if "args" in data:
-            from llama_deck.config import ServerArgs
-
-            args = ServerArgs.from_dict(data["args"])
-
-        try:
-            await app.llama.start(model_path, args)
-            return {"status": "started", "model": model}
-        except RuntimeError as e:
-            abort(409, str(e))
-        except FileNotFoundError as e:
-            abort(404, str(e))
-
-    @app.post("/api/server/stop")
-    async def stop_server(request):
-        """Stop the running llama-server."""
-        await app.llama.stop()
-        return {"status": "stopped"}
-
-    @app.post("/api/server/restart")
-    async def restart_server(request):
-        """Restart llama-server, optionally with new model/args."""
-        data = request.json() if request.body else {}
-        model = data.get("model")
-        model_path = None
-
-        if model:
-            try:
-                model_path = app.models.get_model_path(model)
-            except (ValueError, FileNotFoundError) as e:
-                abort(400, str(e))
-
-        args = None
-        if "args" in data:
-            from llama_deck.config import ServerArgs
-
-            args = ServerArgs.from_dict(data["args"])
-
-        try:
-            await app.llama.restart(model_path, args)
-            return {"status": "restarted"}
-        except (RuntimeError, ValueError) as e:
-            abort(400, str(e))
-
     # --- Config ---
 
     @app.get("/api/config")
@@ -251,29 +319,16 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
         """Update configuration and persist to disk."""
         data = request.json()
 
-        # Update top-level fields
         if "llama_server_path" in data:
             app.config.llama_server_path = data["llama_server_path"]
         if "models_dir" in data:
             app.config.models_dir = data["models_dir"]
             app.models = ModelManager(data["models_dir"])
         if "default_args" in data:
-            from llama_deck.config import ServerArgs
-
             app.config.default_args = ServerArgs.from_dict(data["default_args"])
 
-        # Persist
         save_config(app.config, app.config_path)
         return {"config": app.config.to_dict()}
-
-    # --- Logs ---
-
-    @app.get("/api/logs")
-    async def get_logs(request):
-        """Get recent log lines from llama-server."""
-        n = int(request.query_params.get("n", ["200"])[0])
-        n = min(n, 2000)
-        return {"logs": app.llama.get_logs(n)}
 
     # --- SSE Event Stream ---
 
@@ -282,23 +337,21 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
         """Server-Sent Events stream for real-time updates.
 
         Streams:
-        - log: llama-server stdout/stderr lines
-        - status: server state changes
-        - gpu: GPU stats updates
+        - log: llama-server stdout/stderr lines (tagged with instance_id)
+        - status: instance state changes (tagged with instance_id)
+        - system: GPU/CPU/RAM/disk updates
         - download: download progress updates
         """
-        log_q = app.llama.subscribe_logs()
-        status_q = app.llama.subscribe_status()
+        log_q = app.instances.subscribe_logs()
+        status_q = app.instances.subscribe_status()
         sys_q = app.sysmon.subscribe()
         dl_q = app.models.subscribe_downloads()
 
         async def generate():
             try:
                 while True:
-                    # Check all queues with a short timeout
                     events = []
 
-                    # Drain available events from each queue
                     for event_type, q in [
                         ("log", log_q),
                         ("status", status_q),
@@ -316,7 +369,6 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
                         for event_type, data in events:
                             yield f"event: {event_type}\ndata: {json.dumps(data)}\n\n"
                     else:
-                        # Send keepalive comment every few seconds
                         yield ": keepalive\n\n"
 
                     await asyncio.sleep(0.5)
@@ -324,8 +376,8 @@ def create_app(config: DeckConfig, config_path: Path) -> App:
             except asyncio.CancelledError:
                 pass
             finally:
-                app.llama.unsubscribe_logs(log_q)
-                app.llama.unsubscribe_status(status_q)
+                app.instances.unsubscribe_logs(log_q)
+                app.instances.unsubscribe_status(status_q)
                 app.sysmon.unsubscribe(sys_q)
                 app.models.unsubscribe_downloads(dl_q)
 

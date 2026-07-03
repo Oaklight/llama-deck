@@ -392,7 +392,7 @@ td.actions { white-space: nowrap; text-align: right; }
 <div class="header">
   <div class="header-left">
     <h1>llama-deck <span id="version"></span></h1>
-    <span class="badge badge-dim" id="serverBadge">Stopped</span>
+    <span class="badge badge-dim" id="serverBadge">0 running</span>
   </div>
   <div class="header-right">
     <button class="theme-toggle" onclick="toggleLang()" title="Switch language" id="langBtn">
@@ -408,6 +408,7 @@ td.actions { white-space: nowrap; text-align: right; }
 <!-- Tabs -->
 <div class="tabs">
   <div class="tab active" data-tab="dashboard" data-i18n="tab.dashboard">Dashboard</div>
+  <div class="tab" data-tab="instances" data-i18n="tab.instances">Instances</div>
   <div class="tab" data-tab="models" data-i18n="tab.models">Models</div>
   <div class="tab" data-tab="config" data-i18n="tab.config">Config</div>
   <div class="tab" data-tab="logs" data-i18n="tab.logs">Logs</div>
@@ -418,20 +419,6 @@ td.actions { white-space: nowrap; text-align: right; }
 
   <!-- Dashboard Tab -->
   <div class="tab-panel active" id="tab-dashboard">
-    <!-- Server Controls -->
-    <div class="card">
-      <h3 data-i18n="section.server">Server</h3>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <select id="startModel" style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg-input);color:var(--text);">
-          <option value="" data-i18n="select.model">Select a model...</option>
-        </select>
-        <button class="btn btn-primary" onclick="startServer()" id="btnStart" data-i18n="btn.start">Start</button>
-        <button class="btn btn-danger" onclick="stopServer()" id="btnStop" disabled data-i18n="btn.stop">Stop</button>
-        <button class="btn" onclick="restartServer()" id="btnRestart" disabled data-i18n="btn.restart">Restart</button>
-      </div>
-      <div id="serverInfo" style="margin-top:12px;font-size:13px;color:var(--text-dim);"></div>
-    </div>
-
     <!-- GPU Stats -->
     <div class="section-label" id="gpuSectionLabel" data-i18n="section.gpu">GPU</div>
     <div class="stat-grid" id="gpuGrid">
@@ -478,19 +465,29 @@ td.actions { white-space: nowrap; text-align: right; }
     <div class="section-label" data-i18n="section.storage">Storage</div>
     <div class="stat-grid" id="diskGrid"></div>
 
-    <!-- Server Health / Uptime -->
-    <div class="section-label" data-i18n="section.server">Server</div>
-    <div class="stat-grid">
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.health">Health</div>
-        <div class="value" id="healthValue">--</div>
-        <div class="sub" id="healthSub"></div>
+  </div>
+
+  <!-- Instances Tab -->
+  <div class="tab-panel" id="tab-instances">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h3 style="margin:0;" data-i18n="section.instances">Instances</h3>
+        <button class="btn btn-primary btn-sm" onclick="openNewInstanceModal()" data-i18n="btn.newInstance">New Instance</button>
       </div>
-      <div class="stat-card">
-        <div class="label" data-i18n="stat.uptime">Uptime</div>
-        <div class="value" id="uptimeValue">--</div>
-        <div class="sub" id="uptimeSub"></div>
-      </div>
+      <table id="instancesTable">
+        <thead>
+          <tr>
+            <th data-i18n="col.name">Name</th>
+            <th data-i18n="col.model">Model</th>
+            <th data-i18n="col.port">Port</th>
+            <th data-i18n="col.status">Status</th>
+            <th data-i18n="stat.uptime">Uptime</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="instancesBody"></tbody>
+      </table>
+      <div class="empty-state" id="instancesEmpty" data-i18n="empty.instances">No instances. Click "New Instance" to start one.</div>
     </div>
   </div>
 
@@ -591,6 +588,9 @@ td.actions { white-space: nowrap; text-align: right; }
   <div class="tab-panel" id="tab-logs">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <div style="display:flex;align-items:center;gap:8px;">
+        <select id="logInstanceSelect" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-input);color:var(--text);" onchange="switchLogInstance()">
+          <option value="all">All instances</option>
+        </select>
         <span class="badge badge-dim" id="logCount">0 lines</span>
         <label style="font-size:13px;display:flex;align-items:center;gap:4px;">
           <input type="checkbox" id="logAutoScroll" checked> <span data-i18n="log.autoScroll">Auto-scroll</span>
@@ -601,6 +601,45 @@ td.actions { white-space: nowrap; text-align: right; }
     <div class="log-viewer" id="logViewer"></div>
   </div>
 
+</div>
+
+<!-- New Instance Modal -->
+<div class="modal-overlay" id="newInstanceModal">
+  <div class="modal">
+    <h3 data-i18n="modal.newInstance">New Instance</h3>
+    <div class="form-group">
+      <label data-i18n="col.name">Name</label>
+      <input type="text" id="instName" placeholder="my-chat-server">
+    </div>
+    <div class="form-group">
+      <label data-i18n="col.model">Model</label>
+      <select id="instModel" style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;background:var(--bg-input);color:var(--text);"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-i18n="cfg.port">Port</label>
+        <input type="number" id="instPort" value="8080">
+      </div>
+      <div class="form-group">
+        <label data-i18n="cfg.gpuLayers">GPU Layers</label>
+        <input type="number" id="instGpuLayers" value="99">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label data-i18n="cfg.ctxSize">Context Size</label>
+        <input type="number" id="instCtxSize" value="8192">
+      </div>
+      <div class="form-group">
+        <label data-i18n="cfg.batchSize">Batch Size</label>
+        <input type="number" id="instBatchSize" value="2048">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('newInstanceModal')" data-i18n="btn.cancel">Cancel</button>
+      <button class="btn btn-primary" onclick="createInstance()" data-i18n="btn.start">Start</button>
+    </div>
+  </div>
 </div>
 
 <!-- Confirm Delete Modal -->
@@ -653,17 +692,20 @@ const THEMES = {
 /* ===== i18n ===== */
 const I18N = {
   en: {
-    'tab.dashboard':'Dashboard','tab.models':'Models','tab.config':'Config','tab.logs':'Logs',
+    'tab.dashboard':'Dashboard','tab.instances':'Instances','tab.models':'Models','tab.config':'Config','tab.logs':'Logs',
     'section.server':'Server','section.gpu':'GPU','section.cpuMem':'CPU / Memory','section.storage':'Storage',
-    'section.localModels':'Local Models','section.searchHF':'Search HuggingFace','section.downloads':'Downloads',
+    'section.instances':'Instances','section.localModels':'Local Models','section.searchHF':'Search HuggingFace','section.downloads':'Downloads',
     'section.config':'llama-server Configuration','section.defaultArgs':'Default Server Arguments',
     'stat.vram':'VRAM Usage','stat.gpuTemp':'GPU Temp','stat.gpuUtil':'GPU Utilization','stat.power':'Power',
     'stat.cpu':'CPU Usage','stat.ram':'RAM Usage','stat.health':'Health','stat.uptime':'Uptime',
     'btn.start':'Start','btn.stop':'Stop','btn.restart':'Restart','btn.refresh':'Refresh',
     'btn.search':'Search','btn.save':'Save','btn.reset':'Reset','btn.clear':'Clear',
     'btn.cancel':'Cancel','btn.delete':'Delete','btn.close':'Close','btn.clearDownloads':'Clear Finished','btn.clearSearch':'Clear',
+    'btn.newInstance':'New Instance','btn.remove':'Remove',
     'select.model':'Select a model...','badge.stopped':'Stopped','badge.running':'Running','badge.loading':'Loading...',
-    'col.filename':'Filename','col.size':'Size','col.modified':'Modified',
+    'col.filename':'Filename','col.size':'Size','col.modified':'Modified','col.name':'Name','col.model':'Model','col.port':'Port','col.status':'Status',
+    'empty.instances':'No instances. Click "New Instance" to start one.',
+    'modal.newInstance':'New Instance','toast.instanceCreated':'Instance created','toast.instanceRemoved':'Instance removed',
     'cfg.serverPath':'llama-server path','cfg.modelsDir':'Models directory',
     'cfg.host':'Host','cfg.port':'Port','cfg.gpuLayers':'GPU Layers (n_gpu_layers)','cfg.ctxSize':'Context Size (ctx_size)',
     'cfg.batchSize':'Batch Size','cfg.ubatchSize':'Micro-Batch Size (ubatch_size)',
@@ -685,17 +727,20 @@ const I18N = {
     'status.idle':'idle','status.busy':'busy',
   },
   zh: {
-    'tab.dashboard':'仪表盘','tab.models':'模型','tab.config':'配置','tab.logs':'日志',
+    'tab.dashboard':'仪表盘','tab.instances':'实例','tab.models':'模型','tab.config':'配置','tab.logs':'日志',
     'section.server':'服务器','section.gpu':'GPU','section.cpuMem':'CPU / 内存','section.storage':'存储',
-    'section.localModels':'本地模型','section.searchHF':'搜索 HuggingFace','section.downloads':'下载列表',
+    'section.instances':'实例','section.localModels':'本地模型','section.searchHF':'搜索 HuggingFace','section.downloads':'下载列表',
     'section.config':'llama-server 配置','section.defaultArgs':'默认服务器参数',
     'stat.vram':'显存占用','stat.gpuTemp':'GPU 温度','stat.gpuUtil':'GPU 利用率','stat.power':'功耗',
     'stat.cpu':'CPU 占用','stat.ram':'内存占用','stat.health':'健康状态','stat.uptime':'运行时间',
     'btn.start':'启动','btn.stop':'停止','btn.restart':'重启','btn.refresh':'刷新',
     'btn.search':'搜索','btn.save':'保存','btn.reset':'重置','btn.clear':'清空',
     'btn.cancel':'取消','btn.delete':'删除','btn.close':'关闭','btn.clearDownloads':'清除已完成','btn.clearSearch':'清除',
+    'btn.newInstance':'新建实例','btn.remove':'移除',
     'select.model':'选择模型...','badge.stopped':'已停止','badge.running':'运行中','badge.loading':'加载中...',
-    'col.filename':'文件名','col.size':'大小','col.modified':'修改时间',
+    'col.filename':'文件名','col.size':'大小','col.modified':'修改时间','col.name':'名称','col.model':'模型','col.port':'端口','col.status':'状态',
+    'empty.instances':'暂无实例，点击"新建实例"启动一个。',
+    'modal.newInstance':'新建实例','toast.instanceCreated':'实例已创建','toast.instanceRemoved':'实例已移除',
     'cfg.serverPath':'llama-server 路径','cfg.modelsDir':'模型目录',
     'cfg.host':'主机','cfg.port':'端口','cfg.gpuLayers':'GPU 层数 (n_gpu_layers)','cfg.ctxSize':'上下文大小 (ctx_size)',
     'cfg.batchSize':'批处理大小','cfg.ubatchSize':'微批处理大小 (ubatch_size)',
@@ -737,6 +782,7 @@ function setLang(lang) {
   // Refresh dynamic content that uses t()
   loadModels();
   if (currentTab === 'dashboard') loadStatus();
+  if (currentTab === 'instances') loadInstances();
 }
 
 function toggleLang() {
@@ -775,6 +821,7 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
   currentTab = name;
   localStorage.setItem('llama-deck-tab', name);
+  if (name === 'instances') loadInstances();
   if (name === 'models') { loadModels(); loadDownloads(); }
   if (name === 'config') loadConfig();
 }
@@ -812,7 +859,7 @@ async function api(path, opts = {}) {
 async function loadStatus() {
   try {
     const data = await api('/api/status');
-    updateServerUI(data.server, data.health);
+    updateBadge(data.running_count);
     if (data.gpu) updateGpuUI(data.gpu);
     if (data.cpu) updateCpuUI(data.cpu);
     if (data.ram) updateRamUI(data.ram);
@@ -821,34 +868,14 @@ async function loadStatus() {
   } catch (e) { /* handled */ }
 }
 
-function updateServerUI(server, health) {
+function updateBadge(runningCount) {
   const badge = document.getElementById('serverBadge');
-  const btnStart = document.getElementById('btnStart');
-  const btnStop = document.getElementById('btnStop');
-  const btnRestart = document.getElementById('btnRestart');
-  const info = document.getElementById('serverInfo');
-
-  if (server.running) {
-    const hStatus = health?.status || 'unknown';
-    if (hStatus === 'ok') { badge.className = 'badge badge-ok'; badge.textContent = t('badge.running'); }
-    else if (hStatus === 'loading') { badge.className = 'badge badge-warn'; badge.textContent = t('badge.loading'); }
-    else { badge.className = 'badge badge-warn'; badge.textContent = hStatus; }
-    btnStart.disabled = true; btnStop.disabled = false; btnRestart.disabled = false;
-    info.textContent = t('status.model') + ': ' + (server.model || 'unknown') + ' | PID: ' + (server.pid || '?');
-    document.getElementById('healthValue').textContent = hStatus === 'ok' ? t('status.healthy') : hStatus;
-    document.getElementById('healthSub').textContent = health?.slots_idle != null ? health.slots_idle + ' ' + t('status.idle') + ' / ' + health.slots_processing + ' ' + t('status.busy') : '';
-    if (server.uptime != null) {
-      document.getElementById('uptimeValue').textContent = formatDuration(server.uptime);
-      document.getElementById('uptimeSub').textContent = 'PID ' + server.pid;
-    }
+  if (runningCount > 0) {
+    badge.className = 'badge badge-ok';
+    badge.textContent = runningCount + ' ' + t('badge.running').toLowerCase();
   } else {
-    badge.className = 'badge badge-dim'; badge.textContent = t('badge.stopped');
-    btnStart.disabled = false; btnStop.disabled = true; btnRestart.disabled = true;
-    info.textContent = '';
-    document.getElementById('healthValue').textContent = '--';
-    document.getElementById('healthSub').textContent = '';
-    document.getElementById('uptimeValue').textContent = '--';
-    document.getElementById('uptimeSub').textContent = '';
+    badge.className = 'badge badge-dim';
+    badge.textContent = '0 running';
   }
 }
 
@@ -964,16 +991,6 @@ async function loadModels() {
   try {
     const data = await api('/api/models');
     renderModels(data.models);
-    const sel = document.getElementById('startModel');
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">' + t('select.model') + '</option>';
-    for (const m of data.models) {
-      const opt = document.createElement('option');
-      opt.value = m.filename;
-      opt.textContent = m.filename + ' (' + m.size_human + ')';
-      sel.appendChild(opt);
-    }
-    if (prev) sel.value = prev;
   } catch (e) { /* handled */ }
 }
 
@@ -982,14 +999,18 @@ function renderModels(models) {
   const empty = document.getElementById('modelsEmpty');
   if (!models.length) { body.innerHTML = ''; empty.style.display = ''; return; }
   empty.style.display = 'none';
-  body.innerHTML = models.map(m => `
-    <tr>
-      <td><code>${esc(m.filename)}</code></td>
+  body.innerHTML = models.map(m => {
+    const running = m.instances && m.instances.length;
+    const instBadges = running ? m.instances.map(i =>
+      `<a href="#" onclick="switchTab('instances');return false;" class="badge badge-ok" style="cursor:pointer;text-decoration:none;margin-left:4px;">${esc(i.name)}</a>`
+    ).join('') : '';
+    return `<tr>
+      <td><code>${esc(m.filename)}</code>${instBadges}</td>
       <td>${esc(m.size_human)}</td>
       <td>${new Date(m.modified * 1000).toLocaleDateString()}</td>
-      <td class="actions"><button class="btn btn-sm btn-danger" onclick="askDelete('${esc(m.filename)}')">Delete</button></td>
-    </tr>
-  `).join('');
+      <td class="actions">${running ? '' : `<button class="btn btn-sm btn-danger" onclick="askDelete('${esc(m.filename)}')">${t('btn.delete')}</button>`}</td>
+    </tr>`;
+  }).join('');
 }
 
 function askDelete(filename) {
@@ -1007,22 +1028,97 @@ async function confirmDelete() {
   } catch (e) { /* handled */ }
 }
 
-/* ===== Server Controls ===== */
-async function startServer() {
-  const model = document.getElementById('startModel').value;
-  if (!model) { showToast(t('toast.selectModel'), 'error'); return; }
+/* ===== Instance Management ===== */
+async function loadInstances() {
   try {
-    await api('/api/server/start', { method: 'POST', body: JSON.stringify({ model }) });
-    showToast(t('toast.serverStarting')); setTimeout(loadStatus, 1000);
-  } catch (e) { /* handled */ }
+    const data = await api('/api/instances');
+    renderInstances(data.instances);
+    updateBadge(data.running_count);
+  } catch (e) {}
 }
 
-async function stopServer() {
-  try { await api('/api/server/stop', { method: 'POST' }); showToast(t('toast.serverStopped')); loadStatus(); } catch (e) {}
+function renderInstances(instances) {
+  const body = document.getElementById('instancesBody');
+  const empty = document.getElementById('instancesEmpty');
+  if (!instances || !instances.length) { body.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  body.innerHTML = instances.map(inst => {
+    const hStatus = inst.health?.status || 'unknown';
+    let statusBadge;
+    if (!inst.running) statusBadge = `<span class="badge badge-dim">${t('badge.stopped')}</span>`;
+    else if (hStatus === 'ok') statusBadge = `<span class="badge badge-ok">${t('badge.running')}</span>`;
+    else if (hStatus === 'loading') statusBadge = `<span class="badge badge-warn">${t('badge.loading')}</span>`;
+    else statusBadge = `<span class="badge badge-warn">${hStatus}</span>`;
+    return `<tr>
+      <td><strong>${esc(inst.name)}</strong><div style="font-size:11px;color:var(--text-dim)">${esc(inst.instance_id)}</div></td>
+      <td><a href="#" onclick="switchTab('models');return false;" style="color:var(--accent)">${esc(inst.model || '--')}</a></td>
+      <td>${inst.port || '--'}</td>
+      <td>${statusBadge}</td>
+      <td>${inst.uptime != null ? formatDuration(inst.uptime) : '--'}</td>
+      <td class="actions">
+        ${inst.running ? `<button class="btn btn-sm" onclick="restartInstance('${inst.instance_id}')">${t('btn.restart')}</button>
+        <button class="btn btn-sm btn-danger" onclick="stopInstance('${inst.instance_id}')">${t('btn.stop')}</button>` : ''}
+        <button class="btn btn-sm" onclick="removeInstance('${inst.instance_id}')" style="color:var(--red)">${t('btn.remove')}</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
-async function restartServer() {
-  try { await api('/api/server/restart', { method: 'POST', body: '{}' }); showToast(t('toast.serverRestarting')); setTimeout(loadStatus, 1000); } catch (e) {}
+function openNewInstanceModal() {
+  // Populate model select
+  const sel = document.getElementById('instModel');
+  sel.innerHTML = '';
+  api('/api/models').then(data => {
+    for (const m of data.models) {
+      const opt = document.createElement('option');
+      opt.value = m.filename;
+      opt.textContent = m.filename + ' (' + m.size_human + ')';
+      sel.appendChild(opt);
+    }
+  });
+  // Load default port from config
+  api('/api/config').then(data => {
+    const a = data.config.default_args || {};
+    document.getElementById('instPort').value = a.port || 8080;
+    document.getElementById('instGpuLayers').value = a.n_gpu_layers ?? 99;
+    document.getElementById('instCtxSize').value = a.ctx_size || 8192;
+    document.getElementById('instBatchSize').value = a.batch_size || 2048;
+  });
+  document.getElementById('instName').value = '';
+  openModal('newInstanceModal');
+}
+
+async function createInstance() {
+  const model = document.getElementById('instModel').value;
+  if (!model) { showToast(t('toast.selectModel'), 'error'); return; }
+  const payload = {
+    model,
+    name: document.getElementById('instName').value || undefined,
+    args: {
+      port: parseInt(document.getElementById('instPort').value) || 8080,
+      n_gpu_layers: parseInt(document.getElementById('instGpuLayers').value) ?? 99,
+      ctx_size: parseInt(document.getElementById('instCtxSize').value) || 8192,
+      batch_size: parseInt(document.getElementById('instBatchSize').value) || 2048,
+    },
+  };
+  closeModal('newInstanceModal');
+  try {
+    await api('/api/instances', { method: 'POST', body: JSON.stringify(payload) });
+    showToast(t('toast.instanceCreated'));
+    loadInstances();
+  } catch (e) {}
+}
+
+async function stopInstance(id) {
+  try { await api('/api/instances/' + id + '/stop', { method: 'POST' }); loadInstances(); } catch (e) {}
+}
+
+async function restartInstance(id) {
+  try { await api('/api/instances/' + id + '/restart', { method: 'POST', body: '{}' }); showToast(t('toast.serverRestarting')); setTimeout(loadInstances, 1000); } catch (e) {}
+}
+
+async function removeInstance(id) {
+  try { await api('/api/instances/' + id, { method: 'DELETE' }); showToast(t('toast.instanceRemoved')); loadInstances(); } catch (e) {}
 }
 
 /* ===== HuggingFace Search ===== */
@@ -1168,14 +1264,22 @@ async function saveConfig() {
 }
 
 /* ===== Logs ===== */
+let logFilterInstance = 'all';
+
 function appendLog(line) {
   logLines.push(line);
   if (logLines.length > 2000) logLines = logLines.slice(-1500);
+
+  // Filter by selected instance
+  if (logFilterInstance !== 'all' && line.instance_id && line.instance_id !== logFilterInstance) return;
+
   const viewer = document.getElementById('logViewer');
   const div = document.createElement('div');
   div.className = 'log-line' + (line.stream === 'stderr' ? ' stderr' : '');
+  div.dataset.instanceId = line.instance_id || '';
   const ts = new Date(line.timestamp * 1000).toLocaleTimeString();
-  div.innerHTML = '<span class="ts">' + ts + '</span>' + esc(line.text);
+  const prefix = line.instance_id ? '[' + (line.instance_id).substring(0, 6) + '] ' : '';
+  div.innerHTML = '<span class="ts">' + ts + '</span>' + esc(prefix + line.text);
   viewer.appendChild(div);
   while (viewer.children.length > 2000) viewer.removeChild(viewer.firstChild);
   if (document.getElementById('logAutoScroll').checked) viewer.scrollTop = viewer.scrollHeight;
@@ -1188,8 +1292,50 @@ function clearLogs() {
   document.getElementById('logCount').textContent = '0 lines';
 }
 
+function switchLogInstance() {
+  logFilterInstance = document.getElementById('logInstanceSelect').value;
+  // Re-render logs with filter
+  const viewer = document.getElementById('logViewer');
+  viewer.innerHTML = '';
+  for (const line of logLines) {
+    if (logFilterInstance === 'all' || !line.instance_id || line.instance_id === logFilterInstance) {
+      const div = document.createElement('div');
+      div.className = 'log-line' + (line.stream === 'stderr' ? ' stderr' : '');
+      const ts = new Date(line.timestamp * 1000).toLocaleTimeString();
+      const prefix = line.instance_id ? '[' + (line.instance_id).substring(0, 6) + '] ' : '';
+      div.innerHTML = '<span class="ts">' + ts + '</span>' + esc(prefix + line.text);
+      viewer.appendChild(div);
+    }
+  }
+  document.getElementById('logCount').textContent = viewer.children.length + ' lines';
+  if (document.getElementById('logAutoScroll').checked) viewer.scrollTop = viewer.scrollHeight;
+}
+
+function updateLogInstanceSelector() {
+  const sel = document.getElementById('logInstanceSelect');
+  const prev = sel.value;
+  api('/api/instances').then(data => {
+    sel.innerHTML = '<option value="all">All</option>';
+    for (const inst of (data.instances || [])) {
+      const opt = document.createElement('option');
+      opt.value = inst.instance_id;
+      opt.textContent = inst.name + (inst.running ? '' : ' (stopped)');
+      sel.appendChild(opt);
+    }
+    sel.value = prev || 'all';
+  }).catch(() => {});
+}
+
 async function loadInitialLogs() {
-  try { const data = await api('/api/logs?n=200'); for (const line of data.logs) appendLog(line); } catch (e) {}
+  // Load logs from all instances
+  try {
+    const data = await api('/api/instances');
+    for (const inst of (data.instances || [])) {
+      const logData = await api('/api/instances/' + inst.instance_id + '/logs?n=100');
+      for (const line of logData.logs) appendLog(line);
+    }
+  } catch (e) {}
+  updateLogInstanceSelector();
 }
 
 /* ===== SSE ===== */
@@ -1200,7 +1346,8 @@ function connectSSE() {
   sseSource.addEventListener('log', (e) => appendLog(JSON.parse(e.data)));
 
   sseSource.addEventListener('status', (e) => {
-    updateServerUI(JSON.parse(e.data), null);
+    // Instance status changed — refresh instances and badge
+    if (currentTab === 'instances') loadInstances();
     loadStatus();
   });
 
@@ -1250,6 +1397,7 @@ window.addEventListener('load', async () => {
   const savedTab = localStorage.getItem('llama-deck-tab');
   if (savedTab) switchTab(savedTab);
   await loadStatus();
+  await loadInstances();
   await loadModels();
   await loadInitialLogs();
   connectSSE();
