@@ -339,6 +339,33 @@ td.actions { white-space: nowrap; text-align: right; }
 .file-item .file-name { font-family: var(--mono); }
 .file-item .file-size { color: var(--text-dim); margin: 0 12px; }
 
+/* ===== Capacity Bar ===== */
+.capacity-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.cap-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+.cap-item .cap-label { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+.cap-item .cap-value { font-weight: 600; white-space: nowrap; }
+.cap-item .cap-bar { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; min-width: 40px; }
+.cap-item .cap-bar .fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
+.cap-item .cap-bar.warn .fill { background: var(--orange); }
+.cap-item .cap-bar.danger .fill { background: var(--red); }
+.cap-sep { width: 1px; height: 24px; background: var(--border); margin: 0 12px; flex-shrink: 0; }
+
 /* ===== Responsive ===== */
 @media (max-width: 768px) {
   .content { padding: 16px; }
@@ -469,6 +496,15 @@ td.actions { white-space: nowrap; text-align: right; }
 
   <!-- Models Tab (unified: local models + HF search + downloads) -->
   <div class="tab-panel" id="tab-models">
+    <!-- System Capacity Summary -->
+    <div class="capacity-bar" id="capacityBar">
+      <div class="cap-item" id="capVram"></div>
+      <div class="cap-sep"></div>
+      <div class="cap-item" id="capRam"></div>
+      <div class="cap-sep"></div>
+      <div class="cap-item" id="capDisk"></div>
+    </div>
+
     <!-- Local Models -->
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
@@ -506,6 +542,7 @@ td.actions { white-space: nowrap; text-align: right; }
       <div class="search-bar">
         <input type="text" id="hfSearch" data-i18n-placeholder="placeholder.searchHF" placeholder="Search for GGUF models (e.g. llama-3, qwen2, phi)..." onkeydown="if(event.key==='Enter')searchHF()">
         <button class="btn btn-primary" onclick="searchHF()" data-i18n="btn.search">Search</button>
+        <button class="btn btn-sm" onclick="clearSearch()" id="btnClearSearch" style="display:none;" data-i18n="btn.clearSearch">Clear</button>
       </div>
       <div id="hfResults"></div>
     </div>
@@ -624,7 +661,7 @@ const I18N = {
     'stat.cpu':'CPU Usage','stat.ram':'RAM Usage','stat.health':'Health','stat.uptime':'Uptime',
     'btn.start':'Start','btn.stop':'Stop','btn.restart':'Restart','btn.refresh':'Refresh',
     'btn.search':'Search','btn.save':'Save','btn.reset':'Reset','btn.clear':'Clear',
-    'btn.cancel':'Cancel','btn.delete':'Delete','btn.close':'Close','btn.clearDownloads':'Clear Finished',
+    'btn.cancel':'Cancel','btn.delete':'Delete','btn.close':'Close','btn.clearDownloads':'Clear Finished','btn.clearSearch':'Clear',
     'select.model':'Select a model...','badge.stopped':'Stopped','badge.running':'Running','badge.loading':'Loading...',
     'col.filename':'Filename','col.size':'Size','col.modified':'Modified',
     'cfg.serverPath':'llama-server path','cfg.modelsDir':'Models directory',
@@ -656,7 +693,7 @@ const I18N = {
     'stat.cpu':'CPU 占用','stat.ram':'内存占用','stat.health':'健康状态','stat.uptime':'运行时间',
     'btn.start':'启动','btn.stop':'停止','btn.restart':'重启','btn.refresh':'刷新',
     'btn.search':'搜索','btn.save':'保存','btn.reset':'重置','btn.clear':'清空',
-    'btn.cancel':'取消','btn.delete':'删除','btn.close':'关闭','btn.clearDownloads':'清除已完成',
+    'btn.cancel':'取消','btn.delete':'删除','btn.close':'关闭','btn.clearDownloads':'清除已完成','btn.clearSearch':'清除',
     'select.model':'选择模型...','badge.stopped':'已停止','badge.running':'运行中','badge.loading':'加载中...',
     'col.filename':'文件名','col.size':'大小','col.modified':'修改时间',
     'cfg.serverPath':'llama-server 路径','cfg.modelsDir':'模型目录',
@@ -780,6 +817,7 @@ async function loadStatus() {
     if (data.cpu) updateCpuUI(data.cpu);
     if (data.ram) updateRamUI(data.ram);
     if (data.disks) updateDiskUI(data.disks);
+    updateCapacityBar(data);
   } catch (e) { /* handled */ }
 }
 
@@ -882,6 +920,45 @@ function updateDiskUI(disks) {
   }).join('');
 }
 
+/* ===== Capacity Bar ===== */
+let _lastSystem = {};
+
+function updateCapacityBar(data) {
+  if (data) _lastSystem = data;
+  const s = _lastSystem;
+
+  // VRAM
+  const capVram = document.getElementById('capVram');
+  if (s.gpu) {
+    const used = s.gpu.vram_used_mb, total = s.gpu.vram_total_mb;
+    const pct = total ? (used / total * 100).toFixed(0) : 0;
+    const cls = pct > 90 ? ' danger' : pct > 70 ? ' warn' : '';
+    capVram.innerHTML = `<span class="cap-label">VRAM</span><span class="cap-value">${(used/1024).toFixed(1)}/${(total/1024).toFixed(0)}G</span><div class="cap-bar${cls}"><div class="fill" style="width:${pct}%"></div></div>`;
+  } else {
+    capVram.innerHTML = '<span class="cap-label">VRAM</span><span class="cap-value" style="color:var(--text-dim)">N/A</span>';
+  }
+
+  // RAM
+  const capRam = document.getElementById('capRam');
+  if (s.ram) {
+    const pct = s.ram.percent;
+    const cls = pct > 90 ? ' danger' : pct > 70 ? ' warn' : '';
+    capRam.innerHTML = `<span class="cap-label">RAM</span><span class="cap-value">${(s.ram.used_mb/1024).toFixed(1)}/${(s.ram.total_mb/1024).toFixed(0)}G</span><div class="cap-bar${cls}"><div class="fill" style="width:${pct}%"></div></div>`;
+  } else {
+    capRam.innerHTML = '<span class="cap-label">RAM</span><span class="cap-value" style="color:var(--text-dim)">--</span>';
+  }
+
+  // Disk (first disk = models dir)
+  const capDisk = document.getElementById('capDisk');
+  if (s.disks && s.disks.length) {
+    const d = s.disks[0];
+    const cls = d.percent > 90 ? ' danger' : d.percent > 70 ? ' warn' : '';
+    capDisk.innerHTML = `<span class="cap-label">${t('section.storage')}</span><span class="cap-value">${d.free_gb}G ${t('status.free')}</span><div class="cap-bar${cls}"><div class="fill" style="width:${d.percent}%"></div></div>`;
+  } else {
+    capDisk.innerHTML = `<span class="cap-label">${t('section.storage')}</span><span class="cap-value" style="color:var(--text-dim)">--</span>`;
+  }
+}
+
 /* ===== Models ===== */
 async function loadModels() {
   try {
@@ -956,7 +1033,7 @@ async function searchHF() {
   container.innerHTML = '<div class="empty-state">' + t('empty.searching') + '</div>';
   try {
     const data = await api('/api/models/search?q=' + encodeURIComponent(q));
-    if (!data.results.length) { container.innerHTML = '<div class="empty-state">' + t('empty.noResults') + '</div>'; return; }
+    if (!data.results.length) { container.innerHTML = '<div class="empty-state">' + t('empty.noResults') + '</div>'; document.getElementById('btnClearSearch').style.display = ''; return; }
     container.innerHTML = data.results.map(r => {
       const badges = [];
       if (r.param_count_human) badges.push(r.param_count_human + ' params');
@@ -975,7 +1052,14 @@ async function searchHF() {
         </div>
       </div>`;
     }).join('');
+    document.getElementById('btnClearSearch').style.display = '';
   } catch (e) {}
+}
+
+function clearSearch() {
+  document.getElementById('hfSearch').value = '';
+  document.getElementById('hfResults').innerHTML = '';
+  document.getElementById('btnClearSearch').style.display = 'none';
 }
 
 async function showRepoFiles(repoId) {
@@ -1126,6 +1210,7 @@ function connectSSE() {
     if (d.cpu) updateCpuUI(d.cpu);
     if (d.ram) updateRamUI(d.ram);
     if (d.disks) updateDiskUI(d.disks);
+    updateCapacityBar(d);
   });
 
   sseSource.addEventListener('download', () => { if (currentTab === 'models') loadDownloads(); });
