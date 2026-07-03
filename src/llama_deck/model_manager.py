@@ -153,9 +153,8 @@ class ModelManager:
             models = await asyncio.to_thread(
                 api.list_models,
                 search=query,
-                tags="gguf",
+                filter="gguf",
                 sort="downloads",
-                direction=-1,
                 limit=limit,
             )
 
