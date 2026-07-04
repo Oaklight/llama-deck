@@ -254,6 +254,7 @@ class LlamaInstance:
             "mode": self.mode,
             "uptime": self.uptime,
             "pid": self._process.pid if self._process and self.is_running else None,
+            "args": self._args.to_dict() if self._args else None,
         }
 
     def _build_command(

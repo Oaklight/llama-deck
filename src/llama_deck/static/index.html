@@ -618,7 +618,8 @@ td.actions { white-space: nowrap; text-align: right; }
 <!-- New Instance Modal -->
 <div class="modal-overlay" id="newInstanceModal">
   <div class="modal">
-    <h3 data-i18n="modal.newInstance">New Instance</h3>
+    <h3 id="instModalTitle" data-i18n="modal.newInstance">New Instance</h3>
+    <input type="hidden" id="instEditId" value="">
     <div class="form-group">
       <label data-i18n="col.name">Name</label>
       <input type="text" id="instName" placeholder="my-chat-server">
@@ -659,7 +660,7 @@ td.actions { white-space: nowrap; text-align: right; }
     </div>
     <div class="modal-actions">
       <button class="btn" onclick="closeModal('newInstanceModal')" data-i18n="btn.cancel">Cancel</button>
-      <button class="btn btn-primary" onclick="createInstance()" data-i18n="btn.start">Start</button>
+      <button class="btn btn-primary" onclick="saveInstance()" id="instSaveBtn" data-i18n="btn.start">Start</button>
     </div>
   </div>
 </div>
@@ -727,7 +728,9 @@ const I18N = {
     'select.model':'Select a model...','badge.stopped':'Stopped','badge.running':'Running','badge.loading':'Loading...',
     'col.filename':'Filename','col.size':'Size','col.modified':'Modified','col.name':'Name','col.model':'Model','col.mode':'Mode','col.port':'Port','col.status':'Status',
     'empty.instances':'No instances. Click "New Instance" to start one.',
-    'modal.newInstance':'New Instance','toast.instanceCreated':'Instance created','toast.instanceRemoved':'Instance removed',
+    'modal.newInstance':'New Instance','modal.editInstance':'Edit Instance',
+    'btn.edit':'Edit','btn.saveRestart':'Save & Restart',
+    'toast.instanceCreated':'Instance created','toast.instanceRemoved':'Instance removed',
     'cfg.serverPath':'llama-server path','cfg.modelsDir':'Models directory',
     'cfg.host':'Host','cfg.port':'Port','cfg.gpuLayers':'GPU Layers (n_gpu_layers)','cfg.ctxSize':'Context Size (ctx_size)',
     'cfg.batchSize':'Batch Size','cfg.ubatchSize':'Micro-Batch Size (ubatch_size)',
@@ -762,7 +765,9 @@ const I18N = {
     'select.model':'选择模型...','badge.stopped':'已停止','badge.running':'运行中','badge.loading':'加载中...',
     'col.filename':'文件名','col.size':'大小','col.modified':'修改时间','col.name':'名称','col.model':'模型','col.mode':'模式','col.port':'端口','col.status':'状态',
     'empty.instances':'暂无实例，点击"新建实例"启动一个。',
-    'modal.newInstance':'新建实例','toast.instanceCreated':'实例已创建','toast.instanceRemoved':'实例已移除',
+    'modal.newInstance':'新建实例','modal.editInstance':'编辑实例',
+    'btn.edit':'编辑','btn.saveRestart':'保存并重启',
+    'toast.instanceCreated':'实例已创建','toast.instanceRemoved':'实例已移除',
     'cfg.serverPath':'llama-server 路径','cfg.modelsDir':'模型目录',
     'cfg.host':'主机','cfg.port':'端口','cfg.gpuLayers':'GPU 层数 (n_gpu_layers)','cfg.ctxSize':'上下文大小 (ctx_size)',
     'cfg.batchSize':'批处理大小','cfg.ubatchSize':'微批处理大小 (ubatch_size)',
@@ -1101,27 +1106,36 @@ function renderInstances(instances) {
       <td>${statusBadge}</td>
       <td>${inst.uptime != null ? formatDuration(inst.uptime) : '--'}</td>
       <td class="actions">
-        ${inst.running ? `<button class="btn btn-sm" onclick="restartInstance('${inst.instance_id}')">${t('btn.restart')}</button>
-        <button class="btn btn-sm btn-danger" onclick="stopInstance('${inst.instance_id}')">${t('btn.stop')}</button>` : ''}
+        <button class="btn btn-sm" onclick='editInstance(${JSON.stringify(inst).replace(/'/g,"&#39;")})'>${t('btn.edit')}</button>
+        ${inst.running ? `<button class="btn btn-sm btn-danger" onclick="stopInstance('${inst.instance_id}')">${t('btn.stop')}</button>` : ''}
         <button class="btn btn-sm" onclick="removeInstance('${inst.instance_id}')" style="color:var(--red)">${t('btn.remove')}</button>
       </td>
     </tr>`;
   }).join('');
 }
 
-function openNewInstanceModal() {
-  // Populate model select
+function _populateModelSelect(selectedModel) {
   const sel = document.getElementById('instModel');
   sel.innerHTML = '';
-  api('/api/models').then(data => {
+  return api('/api/models').then(data => {
     for (const m of data.models) {
       const opt = document.createElement('option');
       opt.value = m.filename;
       opt.textContent = m.filename + ' (' + m.size_human + ')';
       sel.appendChild(opt);
     }
+    if (selectedModel) sel.value = selectedModel;
   });
-  // Load default port from config
+}
+
+function openNewInstanceModal() {
+  document.getElementById('instEditId').value = '';
+  document.getElementById('instModalTitle').textContent = t('modal.newInstance');
+  document.getElementById('instSaveBtn').textContent = t('btn.start');
+  document.getElementById('instName').value = '';
+  document.getElementById('instMode').value = 'chat';
+  _populateModelSelect();
+  // Load defaults from config
   api('/api/config').then(data => {
     const a = data.config.default_args || {};
     document.getElementById('instPort').value = a.port || 8080;
@@ -1129,32 +1143,60 @@ function openNewInstanceModal() {
     document.getElementById('instCtxSize').value = a.ctx_size || 8192;
     document.getElementById('instBatchSize').value = a.batch_size || 2048;
   });
-  document.getElementById('instName').value = '';
   openModal('newInstanceModal');
 }
 
-async function createInstance() {
+function editInstance(inst) {
+  document.getElementById('instEditId').value = inst.instance_id;
+  document.getElementById('instModalTitle').textContent = t('modal.editInstance') || 'Edit Instance';
+  document.getElementById('instSaveBtn').textContent = t('btn.saveRestart') || 'Save & Restart';
+  document.getElementById('instName').value = inst.name || '';
+  document.getElementById('instMode').value = inst.mode || 'chat';
+  _populateModelSelect(inst.model);
+  const a = inst.args || {};
+  document.getElementById('instPort').value = a.port || 8080;
+  document.getElementById('instGpuLayers').value = a.n_gpu_layers ?? 99;
+  document.getElementById('instCtxSize').value = a.ctx_size || 8192;
+  document.getElementById('instBatchSize').value = a.batch_size || 2048;
+  openModal('newInstanceModal');
+}
+
+async function saveInstance() {
+  const editId = document.getElementById('instEditId').value;
   const model = document.getElementById('instModel').value;
   if (!model) { showToast(t('toast.selectModel'), 'error'); return; }
   const mode = document.getElementById('instMode').value;
-  const payload = {
-    model,
-    name: document.getElementById('instName').value || undefined,
-    args: {
-      port: parseInt(document.getElementById('instPort').value) || 8080,
-      n_gpu_layers: parseInt(document.getElementById('instGpuLayers').value) ?? 99,
-      ctx_size: parseInt(document.getElementById('instCtxSize').value) || 8192,
-      batch_size: parseInt(document.getElementById('instBatchSize').value) || 2048,
-      embedding: mode === 'embedding',
-      reranking: mode === 'reranking',
-    },
+  const args = {
+    port: parseInt(document.getElementById('instPort').value) || 8080,
+    n_gpu_layers: parseInt(document.getElementById('instGpuLayers').value) ?? 99,
+    ctx_size: parseInt(document.getElementById('instCtxSize').value) || 8192,
+    batch_size: parseInt(document.getElementById('instBatchSize').value) || 2048,
+    embedding: mode === 'embedding',
+    reranking: mode === 'reranking',
   };
   closeModal('newInstanceModal');
-  try {
-    await api('/api/instances', { method: 'POST', body: JSON.stringify(payload) });
-    showToast(t('toast.instanceCreated'));
-    loadInstances();
-  } catch (e) {}
+
+  if (editId) {
+    // Edit = restart with new args
+    try {
+      await api('/api/instances/' + editId + '/restart', {
+        method: 'POST',
+        body: JSON.stringify({ model, args }),
+      });
+      showToast(t('toast.serverRestarting'));
+      setTimeout(loadInstances, 1500);
+    } catch (e) {}
+  } else {
+    // Create new
+    try {
+      await api('/api/instances', {
+        method: 'POST',
+        body: JSON.stringify({ model, name: document.getElementById('instName').value || undefined, args }),
+      });
+      showToast(t('toast.instanceCreated'));
+      loadInstances();
+    } catch (e) {}
+  }
 }
 
 async function stopInstance(id) {
