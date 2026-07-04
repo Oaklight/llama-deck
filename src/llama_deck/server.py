@@ -20,11 +20,7 @@ _index_html: str | None = None
 
 def _load_index_html() -> str:
     """Load index.html from package data."""
-    return (
-        importlib.resources.files("llama_deck")
-        .joinpath("static/index.html")
-        .read_text("utf-8")
-    )
+    return importlib.resources.files("llama_deck").joinpath("static/index.html").read_text("utf-8")
 
 
 def create_app(config: DeckConfig, config_path: Path) -> App:

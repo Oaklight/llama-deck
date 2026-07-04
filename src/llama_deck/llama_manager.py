@@ -81,8 +81,7 @@ class LlamaInstance:
         """Get last N log lines."""
         logs = list(self._logs)[-n:]
         return [
-            {"timestamp": l.timestamp, "stream": l.stream, "text": l.text}
-            for l in logs
+            {"timestamp": line.timestamp, "stream": line.stream, "text": line.text} for line in logs
         ]
 
     def subscribe_logs(self) -> asyncio.Queue:
@@ -141,7 +140,10 @@ class LlamaInstance:
         cmd = self._build_command(server_path, model_path, args)
         logger.info(
             "Starting instance %s (%s) on port %d: %s",
-            self.instance_id, self.name, args.port, " ".join(cmd),
+            self.instance_id,
+            self.name,
+            args.port,
+            " ".join(cmd),
         )
 
         self._process = await asyncio.create_subprocess_exec(
@@ -168,7 +170,9 @@ class LlamaInstance:
 
         logger.info(
             "Stopping instance %s (%s, PID %d)",
-            self.instance_id, self.name, self._process.pid,
+            self.instance_id,
+            self.name,
+            self._process.pid,
         )
 
         try:
@@ -257,20 +261,26 @@ class LlamaInstance:
             "args": self._args.to_dict() if self._args else None,
         }
 
-    def _build_command(
-        self, server_path: str, model_path: str, args: ServerArgs
-    ) -> list[str]:
+    def _build_command(self, server_path: str, model_path: str, args: ServerArgs) -> list[str]:
         """Build the llama-server command line."""
         cmd = [
             server_path,
-            "--model", model_path,
-            "--host", args.host,
-            "--port", str(args.port),
-            "--n-gpu-layers", str(args.n_gpu_layers),
-            "--ctx-size", str(args.ctx_size),
-            "--batch-size", str(args.batch_size),
-            "--ubatch-size", str(args.ubatch_size),
-            "--parallel", str(args.parallel),
+            "--model",
+            model_path,
+            "--host",
+            args.host,
+            "--port",
+            str(args.port),
+            "--n-gpu-layers",
+            str(args.n_gpu_layers),
+            "--ctx-size",
+            str(args.ctx_size),
+            "--batch-size",
+            str(args.batch_size),
+            "--ubatch-size",
+            str(args.ubatch_size),
+            "--parallel",
+            str(args.parallel),
         ]
 
         if args.threads > 0:

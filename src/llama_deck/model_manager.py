@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import os
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -167,27 +166,27 @@ class ModelManager:
                 ctx_len = gguf.get("context_length")
                 total_file_size = gguf.get("totalFileSize")
 
-                results.append({
-                    "repo_id": model.id,
-                    "author": model.author,
-                    "downloads": model.downloads,
-                    "likes": model.likes,
-                    "pipeline_tag": model.pipeline_tag,
-                    "last_modified": model.last_modified.isoformat()
-                    if model.last_modified
-                    else None,
-                    "tags": model.tags or [],
-                    "param_count": param_count,
-                    "param_count_human": _human_params(param_count)
-                    if param_count
-                    else None,
-                    "architecture": arch,
-                    "context_length": ctx_len,
-                    "total_file_size": total_file_size,
-                    "total_file_size_human": _human_size(total_file_size)
-                    if total_file_size
-                    else None,
-                })
+                results.append(
+                    {
+                        "repo_id": model.id,
+                        "author": model.author,
+                        "downloads": model.downloads,
+                        "likes": model.likes,
+                        "pipeline_tag": model.pipeline_tag,
+                        "last_modified": model.last_modified.isoformat()
+                        if model.last_modified
+                        else None,
+                        "tags": model.tags or [],
+                        "param_count": param_count,
+                        "param_count_human": _human_params(param_count) if param_count else None,
+                        "architecture": arch,
+                        "context_length": ctx_len,
+                        "total_file_size": total_file_size,
+                        "total_file_size_human": _human_size(total_file_size)
+                        if total_file_size
+                        else None,
+                    }
+                )
 
         except Exception as e:
             logger.exception("HuggingFace search failed")
@@ -213,11 +212,13 @@ class ModelManager:
             gguf_files = []
             for f in files:
                 if hasattr(f, "rfilename") and f.rfilename.endswith(".gguf"):
-                    gguf_files.append({
-                        "filename": f.rfilename,
-                        "size_bytes": f.size,
-                        "size_human": _human_size(f.size) if f.size else "unknown",
-                    })
+                    gguf_files.append(
+                        {
+                            "filename": f.rfilename,
+                            "size_bytes": f.size,
+                            "size_human": _human_size(f.size) if f.size else "unknown",
+                        }
+                    )
             return sorted(gguf_files, key=lambda f: f["filename"])
         except Exception as e:
             logger.exception("Failed to list repo files: %s", repo_id)

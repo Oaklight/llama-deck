@@ -13,7 +13,8 @@ def build_parser() -> argparse.ArgumentParser:
         description="Lightweight web admin panel for llama.cpp server management",
     )
     parser.add_argument(
-        "-V", "--version",
+        "-V",
+        "--version",
         action="version",
         version=f"%(prog)s {__version__}",
     )

@@ -6,7 +6,6 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "llama-deck"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.json"
 

@@ -165,13 +165,15 @@ class SystemMonitor:
             seen_paths.add(resolved)
             try:
                 usage = psutil.disk_usage(resolved)
-                disks.append({
-                    "path": resolved,
-                    "total_gb": round(usage.total / 1073741824, 1),
-                    "used_gb": round(usage.used / 1073741824, 1),
-                    "free_gb": round(usage.free / 1073741824, 1),
-                    "percent": usage.percent,
-                })
+                disks.append(
+                    {
+                        "path": resolved,
+                        "total_gb": round(usage.total / 1073741824, 1),
+                        "used_gb": round(usage.used / 1073741824, 1),
+                        "free_gb": round(usage.free / 1073741824, 1),
+                        "percent": usage.percent,
+                    }
+                )
             except (FileNotFoundError, PermissionError, OSError):
                 pass
 
